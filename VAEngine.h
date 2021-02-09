@@ -1,0 +1,448 @@
+#ifndef VAEngine_h_
+#define VAEngine_h_
+
+#include "SynthVoice.h"
+#include "Delay.h"
+template <int numvoices,int WAVEFORM_COUNT, int WTLEN> class VAEngine
+{
+  public:
+    VAEngine(float* newwaveforms)
+    {
+      this->waveforms = newwaveforms;
+
+    }
+    ~VAEngine()
+    {
+
+        if(delay)
+        delete delay;
+    }
+    void init(float sampleRate)
+    {
+        //delay = new Delay(sampleRate);
+        //delay->SetFeedback(0.5);
+
+        //delay->SetDelay(sampleRate);
+        //delay->Reset();
+        //SetDelayLevel(0.0);
+        
+        for(int i=0;i<numvoices;i++)
+        {
+            for(int j=0;j<WAVEFORM_COUNT;j++)
+            {
+
+              mSynthVoice[i].SetSampleRate(sampleRate);
+              mSynthVoice[i].AddOsc1SharedWaveTable(WTLEN,&waveforms[j*WTLEN]);
+              mSynthVoice[i].AddOsc2SharedWaveTable(WTLEN,&waveforms[j*WTLEN]);
+            }
+            voices_notes[i]=-1;
+        }
+
+    }
+
+    void update(void)
+    {
+        /*
+      audio_block_t *block;
+      uint32_t i;
+      block = allocate();
+      
+      for (i=0; i < AUDIO_BLOCK_SAMPLES; i++) {
+        block->data[i] = Process()*8192;
+      }
+      transmit(block);
+      release(block);
+      */
+    }
+
+    void fillAudioBuffer(unsigned char* audioBuffer, int len)
+    {
+      float sample;
+      uint32_t isample;
+      uint32_t *buf32;
+      buf32 = (uint32_t*) audioBuffer;
+      for(int i=0;i<len/4;i++)
+      {
+        float sample = Process();
+        sample = (sample+1.0f)/2.0f;
+        isample = sample*255;
+        buf32[i] = ((isample)<<8)+((isample)<<24);
+        
+        
+      }
+    }
+
+
+    float Process()
+    {
+      float s=0.0f;
+      for (int i = 0; i < numvoices; i++)
+      {
+        s = s + (mSynthVoice[i].Process() );
+      }
+      //s = s + delayLevel*delay->Process(s);
+       return s/((float)numvoices);
+    //return s;
+    
+    }
+    void handleNoteSpread(int channel, int note, int spread)
+    {
+        for(int i=0;i<numvoices;i++)
+        {
+            if(voices_notes[i]==note)
+            {
+                mSynthVoice[i].noteSpread(note,spread);
+            }
+        }
+
+    }
+
+    void handleSelectWaveform(uint8_t channel, uint8_t osc, uint8_t note ,uint8_t wave)
+    {
+        for(int i=0;i<numvoices;i++)
+        {
+            if(voices_notes[i]==note)
+            {
+                if(osc==0)
+                {
+                    mSynthVoice[i].MidiOsc1Wave(wave%256);
+                } else {
+                    mSynthVoice[i].MidiOsc2Wave(wave%256);
+                }
+            }
+        }
+    }
+
+  void handleNoteOn(int channel, int note, int velocity)
+    {
+      //bool found = false;
+      int maxnote = -1;
+      int maxnoteidx = -1;
+      for (int i = 0; i < numvoices; i++)
+      {
+        if (voices_notes[i] == -1)
+        {
+          voices_notes[i] = note;
+      
+          mSynthVoice[i].MidiNoteOn(note, velocity);
+      activenotes++;
+      //found = true;
+          return;
+        }
+        if (voices_notes[i] > maxnote)
+        {
+          maxnote = voices_notes[i];
+          maxnoteidx = i;
+        }
+      }
+      voices_notes[maxnoteidx] = note;
+      mSynthVoice[maxnoteidx].MidiNoteOn(note, velocity);
+    activenotes++;
+    }
+
+    void handleNoteTransition(int channel, int oldnote,int newNote, int velocity)
+    {
+        for(int i=0;i<numvoices;i++)
+        {
+            if(voices_notes[i] == oldnote)
+            {
+                voices_notes[i] = newNote;
+                mSynthVoice[i].MidiChangeNote(newNote,velocity);
+
+
+            }
+        }
+    }
+    void handleNoteOff(int channel, int note, int velocity)
+    {
+      //digitalWrite(LED, LOW);
+      for (int i = 0; i < numvoices; i++)
+      {
+        if (voices_notes[i] == note)
+        {
+          voices_notes[i] = -1;
+          mSynthVoice[i].MidiNoteOff();
+      activenotes--;
+          //break;
+        }
+      }
+    }
+    void handlePitchBend(int channel, uint8_t bendlsb, uint8_t bendmsb)
+    {
+      
+      uint16_t bend = bendmsb<<7 | bendlsb;
+      for(int i=0;i<numvoices;i++)
+      {
+        
+        mSynthVoice[i].MidiBend(bend);
+      }
+        
+    }
+    
+  void handleSetTet(int tet)
+  {
+        this->tet = tet;
+    for (int i = 0; i < numvoices; i++)
+    {
+      mSynthVoice[i].SetTet(tet);
+    }
+  }
+  void handleSetTune(float tune)
+  {
+    for (int i = 0; i < numvoices; i++)
+    {
+      mSynthVoice[i].SetTune(tune);
+    }
+  }
+    void handlePitchBend(uint8_t channel, int bend)
+    {
+      
+      for(int i=0;i<numvoices;i++)
+      {
+        if(mSynthVoice[i].IsPlaying())
+        {
+          mSynthVoice[i].MidiBend(bend);
+        }
+      }
+      
+      
+    }
+
+    float rampUp(int sample)
+    {
+        float ret = upMaxValue;
+    
+        if(sample<upSamples)
+        {
+            ret = upMinValue+sample*upfactor;
+        }
+
+        return ret;
+    }
+    float rampDown(int sample)
+    {
+        float ret = downMinValue;
+        if(sample<downSamples)
+        {
+            ret = upMaxValue-sample*downfactor;
+        }
+        return ret;
+    }
+    void handleSetOctaveFactor(float factor)
+    {
+        for(int i=0;i<numvoices;i++)
+        {
+            mSynthVoice[i].SetOctaveFactor(factor);
+        }
+    }
+  void setADSR(uint8_t a, uint8_t d, uint8_t s, uint8_t r)
+  {
+    for (int i = 0; i < numvoices; i++)
+    {
+      mSynthVoice[i].SetOsc1ADSR(a,d,s,r);
+      mSynthVoice[i].SetOsc2ADSR(a,d,s,r);
+    }
+  }
+  void setOsc1Wave(uint8_t w)
+  {
+    this->osc1Wave = w;
+    for (int i = 0; i < numvoices; i++)
+    {
+      mSynthVoice[i].MidiOsc1Wave(w);
+    }
+  }
+  uint8_t getOsc1Wave()
+  {
+    return this->osc1Wave;
+  }
+  void setOsc2Wave(uint8_t w)
+  {
+    for (int i = 0; i < numvoices; i++)
+    {
+      mSynthVoice[i].MidiOsc2Wave(w);
+    }
+  }
+  uint8_t getOsc2Wave()
+  {
+    return this->osc2Wave;
+  }
+  void setPwm(uint8_t pwm)
+  {
+    for (int i = 0; i < numvoices; i++)
+    {
+      mSynthVoice[i].MidiPwm(pwm);
+    }
+  }
+  
+    void handleControlChange(uint8_t channel, uint8_t control, uint8_t value)
+    {
+      for(int i=0;i<numvoices;i++)
+      {
+        mSynthVoice[i].ControlChange(channel,control, value);
+      }      
+    }
+    float* getWavedata()
+    {
+        return wavedata;
+    }
+    void SetPlay(bool flag)
+    {
+
+        if(flag)
+        {
+
+            int newStart = recIndexStart+trimStart;
+            int newEnd = recIndexEnd-trimEnd;
+            if(newStart>=recBufferLen-1)
+            {
+                newStart = 0;
+            }
+            if(newEnd<0)
+            {
+                newEnd = recIndexEnd;
+                if(newEnd<0)
+                {
+                    newEnd = 0;
+                }
+            }
+            int newLen = newEnd-newStart-1;
+            if(newLen<0)
+            {
+                newLen =0;
+            }
+            memcpy(playBuffer,&recBuffer[newStart],sizeof(float)*(newLen));
+            playIndexStart = 0;
+            playIndexEnd = newEnd;
+            playIndex = 0;
+        }
+        this->play = flag;   Serial.print(".");
+    }
+    void SetupRampUp(float upMinValue, float upMaxValue, int ms)
+    {
+        upSamples = ((float)ms*sampleRate)/1000.0;
+        if(upSamples >0) {
+            upfactor = (upMaxValue - upMinValue) / upSamples;
+        }
+        else
+        {
+            upfactor = 0;
+        }
+        upTimeMs = ms;
+    }
+    void SetupRampDown(float downMinValue, float downMaxValue, int ms)
+    {
+        downSamples = ((float)ms*sampleRate/1000.0);
+        if(downSamples>0) {
+            downfactor = (downMaxValue - downMinValue) / downSamples;
+        } else
+        {
+            downfactor = 0;
+        }
+        downTimeMs = ms;
+    }
+    void SetRecord(bool flag)
+    {
+
+        if(flag)
+        {
+            this->recIndexStart = 0;
+            this->recIndexEnd = 0;
+            this->recIndex = 0;
+        } else
+        {
+            if(play)
+            {
+                int newStart = recIndexStart+trimStart;
+                int newEnd = recIndexEnd-trimEnd;
+                if(newStart>=recBufferLen)
+                {
+                    newStart = 0;
+                }
+                if(newEnd<0)
+                {
+                    newEnd = recBufferLen-1;
+                    if(newEnd<0)
+                    {
+                        newEnd = 0;
+                    }
+                }
+                int newLen = newEnd-newStart-1;
+                memcpy(playBuffer,&recBuffer[newStart],sizeof(float)*(newLen));
+                playIndexStart = 0;
+                playIndexEnd = newEnd;
+                playIndex = 0;
+            }
+        }
+        this->record = flag;
+    }
+    int MillisecondsToSamples(int millis)
+    {
+        return (int)(((double)millis*sampleRate)/1000.0);
+    }
+    void SetStartTrim(int ms)
+    {
+        trimStart = MillisecondsToSamples(ms);
+    }
+    void SetEndTrim(int ms)
+    {
+        trimEnd  = MillisecondsToSamples(ms);
+    }
+    void SetDelayLevel(float level)
+    {
+        this->delayLevel = level;
+    }
+    void SetDelayLength(int length)
+    {
+        delay->SetDelay(length);
+    }
+    void SetDelayFeedback(float feedback)
+    {
+        delay->SetFeedback(feedback);
+    }
+    private:
+      SynthVoice mSynthVoice[numvoices];
+      int voices_notes[numvoices];
+      float* waveforms;
+      int activenotes = 0;
+      int osc1Wave = 0;
+      int osc2Wave = 0;
+      int osc1Vol = 0;
+      int osc2Vol = 0;
+      int osc1Pwm = 0;
+      int osc2Pwm = 0;
+      int tet = 12;
+  
+      //Stream params
+      int kChannelCount = 2;
+      int sampleRate = 48000;
+      float wavedata[256];
+      int index = 0;
+      float* recBuffer;
+      int recIndexStart = 0;
+      int recIndexEnd = 0;
+      int recIndex = 0;
+      int recBufferLen = 0;
+      float* playBuffer;
+      int playIndex = 0;
+      int playIndexStart = 0;
+      int playIndexEnd = 0;
+      int playBufferLen = 0;
+  
+      bool play = false;
+      bool record = false;
+      float upMinValue = 0;
+      float upMaxValue = 1.0;
+      float downMinValue = 0;
+      float downMaxValue = 1.0;
+      float upfactor;
+      float upTimeMs;
+      int upSamples ;
+      float downfactor;
+      float downTimeMs;
+      int downSamples;
+      int trimEnd = 0;
+      int trimStart = 0;
+      float delayLevel = 0.0f;
+      Delay* delay;
+};
+#endif
