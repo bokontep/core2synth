@@ -19,7 +19,7 @@
 #define WFCOUNT 128
 #define SAMPLE_RATE 8000
 float waveforms[WTLEN*WFCOUNT];
-const int audio_buf_len = 512;
+const int audio_buf_len = 128;
 unsigned char audio_buf[audio_buf_len];
 unsigned char audio_buf2[audio_buf_len];
 VAEngine<2,WFCOUNT, WTLEN> *engine;
@@ -55,7 +55,7 @@ bool InitI2SSpakerOrMic(int mode)
         .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
         .communication_format = I2S_COMM_FORMAT_I2S_MSB,
         .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-        .dma_buf_count = 4,
+        .dma_buf_count = 8,
         .dma_buf_len = audio_buf_len,
     };
     if (mode == MODE_MIC)
@@ -93,15 +93,23 @@ void i2s_task(void *arg) {
     InitI2SSpakerOrMic(MODE_SPK);
     engine = new VAEngine<2,WFCOUNT, WTLEN>(waveforms);
     engine->init(SAMPLE_RATE);
-    engine->setADSR(10,10,127,10);
+    engine->setADSR(0,127,127,1);
+    long t1,t2,t3,t4;
+    int c=0;
     while(1)
     {
       
       size_t bytes_written = 0;
+      t1=millis();
       engine->fillAudioBuffer(audio_buf,audio_buf_len);
+      t2 = millis();
       //memcpy(audio_buf2,audio_buf,audio_buf_len);
+     
       i2s_write(SPAKER_I2S_NUMBER, audio_buf, audio_buf_len, &bytes_written, portMAX_DELAY);
-      vTaskDelay(1);
+      t3 = millis();
+      delay(1);
+      
+      
     
     }
 }
@@ -148,7 +156,7 @@ void loop() {
     {
       currnote  =((trill_x1/divisor)+baseNote)%127;
       currwave = trill_y1%WFCOUNT;
-      engine->handleNoteOn(1, currnote, 60127);
+      engine->handleNoteOn(1, currnote, 127);
       int wave1 = currwave;
       if( wave1<0)
         wave1 = 0;
