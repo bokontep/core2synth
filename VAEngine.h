@@ -3,7 +3,8 @@
 
 #include "SynthVoice.h"
 #include "Delay.h"
-template <int numvoices,int WAVEFORM_COUNT, int WTLEN> class VAEngine
+#include "SampleSource.h"
+template <int numvoices,int WAVEFORM_COUNT, int WTLEN> class VAEngine : public SampleSource
 {
   public:
     VAEngine(float* newwaveforms)
@@ -19,6 +20,7 @@ template <int numvoices,int WAVEFORM_COUNT, int WTLEN> class VAEngine
     }
     void init(float sampleRate)
     {
+      this->sampleRate = (int)sampleRate;
         //delay = new Delay(sampleRate);
         //delay->SetFeedback(0.5);
 
@@ -55,22 +57,22 @@ template <int numvoices,int WAVEFORM_COUNT, int WTLEN> class VAEngine
       */
     }
 
-    void fillAudioBuffer(unsigned char* audioBuffer, int len)
+
+    virtual int getSampleRate() { return sampleRate; }
+    // This should fill the samples buffer with the specified number of frames
+    // A frame contains a LEFT and a RIGHT sample. Each sample should be signed 16 bits
+    virtual void getFrames(Frame_t *frames, int number_frames)
     {
-      float sample;
-      uint32_t isample;
-      uint32_t *buf32;
-      buf32 = (uint32_t*) audioBuffer;
-      for(int i=0;i<len/4;i++)
+
+    // fill the buffer with data from the file wrapping around if necessary
+      for (int i = 0; i < number_frames; i++)
       {
-        float sample = Process();
-        sample = (sample+1.0f)/2.0f;
-        isample = sample*255;
-        buf32[i] = ((isample)<<8)+((isample)<<24);
-        
+        frames[i].left = frames[i].right = 16384 * Process();
         
       }
     }
+
+
 
 
     float Process()
@@ -81,8 +83,8 @@ template <int numvoices,int WAVEFORM_COUNT, int WTLEN> class VAEngine
         s = s + (mSynthVoice[i].Process() );
       }
       //s = s + delayLevel*delay->Process(s);
-       return s/((float)numvoices);
-    //return s;
+       //return s/((float)numvoices);
+      return s;
     
     }
     void handleNoteSpread(int channel, int note, int spread)
@@ -414,7 +416,7 @@ template <int numvoices,int WAVEFORM_COUNT, int WTLEN> class VAEngine
   
       //Stream params
       int kChannelCount = 2;
-      int sampleRate = 48000;
+      int sampleRate = 44100;
       float wavedata[256];
       int index = 0;
       float* recBuffer;

@@ -11,7 +11,7 @@ void initWaveforms(float* waveforms, int waveform_len, int waveform_count,bool b
 {
 
   
-  float sinf = 1.0;
+  float sin_f = 1.0;
   
   for (int w = 0; w < waveform_count; w++)
   {

@@ -10,33 +10,32 @@ class SynthVoice  {
 public:
     SynthVoice()
     {
-        this->sampleRate = 8000;
-        this->modulation = 0;
-        this->pwm = 0.5;
-    this->vol1 = 1.0;
-    this->vol2 = 1.0;
-        this->fmod1 = 1.0;
-        this->fmod2 = 1.0;
-        this->fmod3 = 0.0;
-        this->ffreq = 1.0;
-        this->fq = 0.1;
-    this->wt1_idx = 0;
-    this->wt2_idx = 0;
-    lowpass.SetParameters(ffreq, fq);
-    
+      this->sampleRate = 8000;
+      this->modulation = 0;
+      this->pwm = 0.5;
+      this->vol1 = 1.0;
+      this->vol2 = 1.0;
+      this->fmod1 = 1.0;
+      this->fmod2 = 1.0;
+      this->fmod3 = 0.0;
+      this->ffreq = 1.0;
+      this->fq = 0.1;
+      this->wt1_idx = 0;
+      this->wt2_idx = 0;
+      lowpass.SetParameters(ffreq, fq);
     }
     SynthVoice(float sampleRate) {
-        this->sampleRate = sampleRate;
-        this->modulation = 0;
-        this->pwm = 0.5;
-        this->fmod1 = 1.0;
-        this->fmod2 = 1.0;
-        this->fmod3 = 0.0;
-        this->ffreq = 1.0;
-        this->fq = 0.1;
-    wt1_idx = 0;
-    wt2_idx = 0;
-    lowpass.SetParameters(ffreq, fq);
+      this->sampleRate = sampleRate;
+      this->modulation = 0;
+      this->pwm = 0.5;
+      this->fmod1 = 1.0;
+      this->fmod2 = 1.0;
+      this->fmod3 = 0.0;
+      this->ffreq = 1.0;
+      this->fq = 0.1;
+      wt1_idx = 0;
+      wt2_idx = 0;
+      lowpass.SetParameters(ffreq, fq);
     }
     ~SynthVoice(void) {
 
@@ -48,20 +47,19 @@ public:
 
     void MidiNoteOn(int note, int vel)
     {
-        
-        //float f = pow(octave_factor,(note*1.0-69.0)/tet)*tune;
-        float f = pow(octave_factor,(note*1.0-(tet*5.75))/tet)*tune;
-
-        velocity = vel/127.0;
-        freq1 = f;
-        freq2 = f;
-        osc[0].SetFrequency(freq1,sampleRate);
-        osc[1].SetFrequency(freq2,sampleRate);
-        adsr[0].Gate(1);
-        adsr[1].Gate(1);
-        osc[0].ResetPhase();
-        osc[1].ResetPhase();
+      //float f = pow(octave_factor,(note*1.0-69.0)/tet)*tune;
+      float f = pow(octave_factor,(note*1.0-(tet*5.75))/tet)*tune;
+      velocity = vel/127.0;
+      freq1 = f;
+      freq2 = f;
+      osc[0].SetFrequency(freq1,sampleRate);
+      osc[1].SetFrequency(freq2,sampleRate);
+      adsr[0].Gate(1);
+      adsr[1].Gate(1);
+      osc[0].ResetPhase();
+      osc[1].ResetPhase();
     }
+    
     void MidiChangeNote(int note, int vel)
     {
         //float f = pow(octave_factor,(newNote*1.0-69.0)/tet)*tune;
@@ -71,66 +69,79 @@ public:
         freq2 = f;
         osc[0].SetFrequency(freq1,sampleRate);
         osc[1].SetFrequency(freq2,sampleRate);
-
-
     }
+
     void Lfo1SetFrequency(float frequency)
     {
         lfo[0].SetFrequency(frequency,sampleRate/32);
     }
+    
     void Lfo2SetFrequency(float frequency)
     {
         lfo[1].SetFrequency(frequency,sampleRate/32);
     }
+    
     void MidiNoteOff()
     {
         adsr[0].Gate(0);
         adsr[1].Gate(0);
     }
+    
     void AddOsc1WaveTable(int len, float *waveTableIn)
     {
         osc[0].AddWaveTable(len,waveTableIn);
     }
+    
     void AddOsc1SharedWaveTable(int len, float *waveTableIn)
     {
         osc[0].AddSharedWaveTable(len, waveTableIn);
     }
+    
     void AddOsc2WaveTable(int len, float *waveTableIn)
     {
         osc[1].AddWaveTable(len,waveTableIn);
     }
+    
     void AddOsc2SharedWaveTable(int len, float *waveTableIn)
     {
         osc[1].AddSharedWaveTable(len, waveTableIn);
     }
+    
     void AddLfo1SharedWaveTable(int len, float *waveTableIn)
     {
         lfo[0].AddSharedWaveTable(len,waveTableIn);
     }
+    
     void AddLfo2SharedWaveTable(int len, float *waveTableIn)
     {
         lfo[1].AddSharedWaveTable(len,waveTableIn);
     }
+    
     void SetOsc1ADSR(uint8_t a, float d,float s,float r)
     {
         adsr[0].SetADSR(a,d,s,r);
     }
+    
     void SetOsc2ADSR(uint8_t a, float d, float s, float r)
     {
         adsr[1].SetADSR(a,d,s,r);
     }
+    
     void SetFmod1(uint8_t fmod)
     {
       this->fmod1 = fmod/64;
     }
+    
     void SetFmod2(uint8_t fmod)
     {
       this->fmod2 = fmod/64;
     }
+    
     void SetFmod3(uint8_t fmod)
     {
       this->fmod3 = fmod/64;
     }
+    
     void noteSpread( int note, int spread)
     {
         spread = spread-63;
@@ -142,10 +153,12 @@ public:
         osc[1].SetFrequency(bendfreq2,sampleRate);
 
     }
+    
     void SetOctaveFactor(float factor)
     {
         this->octave_factor = factor;
     }
+    
     void MidiBend(int bend)
     {
       //AudioNoInterrupts();
